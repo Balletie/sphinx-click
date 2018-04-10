@@ -36,7 +36,7 @@ def _get_help_record(opt):
     def _write_opts(opts):
         rv, _ = click.formatting.join_options(opts)
         if not opt.is_flag and not opt.count:
-            rv += ' <{}>'.format(opt.name)
+            rv += ' {}'.format(opt.make_metavar())
         return rv
 
     rv = [_write_opts(opt.opts)]
