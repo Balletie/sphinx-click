@@ -70,6 +70,8 @@ def _format_description(ctx):
 
     for line in statemachine.string2lines(
             help_string, tab_width=4, convert_whitespace=True):
+        if line.strip() == '\b':
+            continue
         yield line
     yield ''
 
