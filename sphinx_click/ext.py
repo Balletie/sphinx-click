@@ -78,10 +78,9 @@ def _format_description(ctx):
 
 def _format_usage(ctx):
     """Format the usage for a `click.Command`."""
-    yield '.. code-block:: shell'
     yield ''
     for line in _get_usage(ctx).splitlines():
-        yield _indent(line)
+        yield line
     yield ''
 
 
