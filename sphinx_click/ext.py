@@ -18,10 +18,8 @@ def _indent(text, level=1):
 
 def _get_usage(ctx):
     """Alternative, non-prefixed version of 'get_usage'."""
-    formatter = ctx.make_formatter()
     pieces = ctx.command.collect_usage_pieces(ctx)
-    formatter.write_usage(ctx.command_path, ' '.join(pieces), prefix='')
-    return formatter.getvalue().rstrip('\n')
+    return '**' + ctx.command_path + '** ' + ' '.join(pieces)
 
 
 def _get_help_record(opt):
