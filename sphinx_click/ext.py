@@ -5,6 +5,7 @@ from docutils import nodes, statemachine
 from docutils.parsers import rst
 from docutils.parsers.rst import directives
 
+from sphinx.util.nodes import nested_parse_with_titles
 
 def _indent(text, level=1):
     prefix = ' ' * (4 * level)
@@ -179,16 +180,25 @@ def _filter_commands(ctx, commands=None):
 def _format_command(ctx, show_nested, commands=None):
     """Format the output of `click.Command`."""
 
+    yield '.. program:: {}'.format(ctx.command_path)
+    yield ''
+
+    # usage
+    yield 'Synopsis'
+    yield '--------'
+    yield ''
+
+    for line in _format_usage(ctx):
+        yield line
+
+    # usage
+    yield 'Description'
+    yield '-----------'
+    yield ''
+
     # description
 
     for line in _format_description(ctx):
-        yield line
-
-    yield '.. program:: {}'.format(ctx.command_path)
-
-    # usage
-
-    for line in _format_usage(ctx):
         yield line
 
     # options
@@ -197,7 +207,8 @@ def _format_command(ctx, show_nested, commands=None):
     if lines:
         # we use rubric to provide some separation without exploding the table
         # of contents
-        yield '.. rubric:: Options'
+        yield 'Options'
+        yield '-------'
         yield ''
 
     for line in lines:
@@ -207,7 +218,8 @@ def _format_command(ctx, show_nested, commands=None):
 
     lines = list(_format_arguments(ctx))
     if lines:
-        yield '.. rubric:: Arguments'
+        yield 'Arguments'
+        yield '---------'
         yield ''
 
     for line in lines:
@@ -217,7 +229,8 @@ def _format_command(ctx, show_nested, commands=None):
 
     lines = list(_format_envvars(ctx))
     if lines:
-        yield '.. rubric:: Environment variables'
+        yield 'Environment variables'
+        yield '---------------------'
         yield ''
 
     for line in lines:
@@ -230,7 +243,8 @@ def _format_command(ctx, show_nested, commands=None):
     commands = _filter_commands(ctx, commands)
 
     if commands:
-        yield '.. rubric:: Commands'
+        yield 'Commands'
+        yield '--------'
         yield ''
 
     for command in commands:
@@ -315,10 +329,11 @@ class ClickDirective(rst.Directive):
         result = statemachine.ViewList()
 
         lines = _format_command(ctx, show_nested, commands)
+
         for line in lines:
             result.append(line, source_name)
 
-        self.state.nested_parse(result, 0, section)
+        nested_parse_with_titles(self.state, result, section)
 
         # Subcommands
 
