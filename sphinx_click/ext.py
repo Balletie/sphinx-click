@@ -1,3 +1,4 @@
+import collections
 import traceback
 
 import click
@@ -253,14 +254,11 @@ def _format_command(ctx, show_nested, commands=None):
         yield ''
 
 
-class ClickDirective(rst.Directive):
-
-    has_content = False
+class AbstractClickDirective(rst.Directive):
+    has_content = True
     required_arguments = 1
     option_spec = {
         'prog': directives.unchanged_required,
-        'show-nested': directives.flag,
-        'commands': directives.unchanged,
     }
 
     def _load_module(self, module_path):
@@ -295,6 +293,20 @@ class ClickDirective(rst.Directive):
 
         return getattr(mod, attr_name)
 
+    def _get_context(self, name, command, parent=None):
+        return click.Context(command, info_name=name, parent=parent)
+
+
+class ClickDirective(AbstractClickDirective):
+    has_content = False
+    required_arguments = 1
+    option_spec = {
+        'prog': directives.unchanged_required,
+        'show-nested': directives.flag,
+        'auto': directives.flag,
+        'commands': directives.unchanged,
+    }
+
     def _generate_nodes(self,
                         name,
                         command,
@@ -313,15 +325,8 @@ class ClickDirective(rst.Directive):
             empty
         :returns: A list of nested docutil nodes
         """
-        ctx = click.Context(command, info_name=name, parent=parent)
-
-        # Title
-
-        section = nodes.section(
-            '',
-            nodes.title(text=name),
-            ids=[nodes.make_id(ctx.command_path)],
-            names=[nodes.fully_normalize_name(ctx.command_path)])
+        node = nodes.Element()
+        ctx = self._get_context(name, command, parent)
 
         # Summary
 
@@ -333,18 +338,17 @@ class ClickDirective(rst.Directive):
         for line in lines:
             result.append(line, source_name)
 
-        nested_parse_with_titles(self.state, result, section)
-
+        nested_parse_with_titles(self.state, result, node)
+        
         # Subcommands
-
         if show_nested:
             commands = _filter_commands(ctx, commands)
             for command in commands:
-                section.extend(
+                node.extend(
                     self._generate_nodes(command.name, command, ctx,
                                          show_nested))
 
-        return [section]
+        return node[:]
 
     def run(self):
         self.env = self.state.document.settings.env
@@ -358,9 +362,64 @@ class ClickDirective(rst.Directive):
         show_nested = 'show-nested' in self.options
         commands = self.options.get('commands')
 
-        return self._generate_nodes(prog_name, command, None, show_nested,
-                                    commands)
+        self.env.temp_data = collections.ChainMap(
+            {'click:command': command,
+             'click:prog': prog_name,},
+            self.env.temp_data
+        )
+
+        try:
+            return self._generate_nodes(prog_name, command, None, show_nested,
+                                        commands)
+        finally:
+            self.env.temp_data = self.env.temp_data.parents
+
+
+class ClickOptionsDirective(AbstractClickDirective):
+    has_content = False
+    required_arguments = 0
+    optional_arguments = 1
+    option_spec = {
+        'prog': directives.unchanged,
+    }
+
+    def _generate_nodes(self, prog_name, command):
+        ctx = self._get_context(prog_name, command)
+
+        lines = _format_options(ctx)
+        node = nodes.Element()
+        result = statemachine.ViewList()
+        source_name = ctx.command_path
+
+        for line in lines:
+            result.append(line, source_name)
+
+        nested_parse_with_titles(self.state, result, node)
+
+        return node[:]
+
+    def run(self):
+        self.env = self.state.document.settings.env
+        command = None
+        if self.arguments:
+            command = self._load_module(self.arguments[0])
+        else:
+            command = self.env.temp_data.get('click:command')
+
+        prog_name = self.options.get(
+            'prog',
+            self.env.temp_data.get('click:prog', '')
+        )
+
+        if command is None:
+            raise self.error(
+                "The {} directive can only be used within a `click`"
+                " directive.".format(self.name)
+            )
+
+        return self._generate_nodes(prog_name, command)
 
 
 def setup(app):
     app.add_directive('click', ClickDirective)
+    app.add_directive('click-options', ClickOptionsDirective)
