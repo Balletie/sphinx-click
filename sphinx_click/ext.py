@@ -45,7 +45,7 @@ def _get_help_record(opt):
     if opt.secondary_opts:
         rv.append(_write_opts(opt.secondary_opts))
 
-    help = opt.help or ''
+    help = getattr(opt, 'rich_help', opt.help or '')
     extra = []
     if opt.default is not None and opt.show_default:
         extra.append('default: %s' %
